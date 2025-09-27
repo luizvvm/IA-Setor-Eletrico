@@ -1,0 +1,10 @@
+[
+  {
+    "id": "intercambio_energia_modalidade",
+    "description": "Contém o histórico de dados de intercâmbio de energia por modalidade, com valores horários em MWh. Ideal para perguntas sobre a troca de energia entre subsistemas (Norte, Nordeste, Sul, Sudeste/Centro-Oeste).",
+    "slug": "intercambio_modalidade_ho",
+    "file_prefix": "INTERCAMBIO_ENERGIA_MODALIDADE",
+    "extension": "csv",
+    "frequency": "yearly"
+  }
+]
