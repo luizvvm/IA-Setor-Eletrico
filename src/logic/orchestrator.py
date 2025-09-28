@@ -2,51 +2,64 @@
 
 import sys
 import os
+import re
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from src.logic.dataset_catalog import CURATED_DATASETS
+import json
+from src.logic.api_client import get_all_datasets_from_api, format_datasets_for_llm
 from src.logic.intent_engine import get_intent_from_gemini, configure_gemini
 from src.logic.data_collector import fetch_and_combine_data
 from src.logic.insight_engine import get_insight_from_data
 
-def run_query_pipeline(user_query: str, chat_history: list = []) -> dict:
-    print("--- INICIANDO PIPELINE (MODO ESPECIALISTA) ---")
+# (Mantenha as importações no topo do arquivo)
+# Adicione esta importação se ela não estiver lá
+from src.logic.dataset_catalog import CURATED_DATASET
 
+def run_query_pipeline(user_query: str, chat_history: list = []) -> dict:
+    print("--- INICIANDO PIPELINE DE ORQUESTRAÇÃO (MODO SIMPLIFICADO) ---")
+
+    # 1. Configurar a API do Gemini
     try:
         configure_gemini()
     except ValueError as e:
-        return {"answer": f"Erro de configuração: {e}", "dataframe": None}
+        return {"answer": f"Erro de configuração da IA: {e}", "dataframe": None}
 
-    intent_plan = get_intent_from_gemini(user_query, CURATED_DATASETS, chat_history)
+    # 2. Obter o período (anos) da pergunta do usuário
+    print("[Orquestrador] Extraindo período da pergunta do usuário...")
+    period_plan = get_intent_from_gemini(user_query) # Chamada corrigida
     
-    if "error" in intent_plan or "action_plan" not in intent_plan:
-        # Se não for um plano de ação, pode ser uma resposta direta
-        if intent_plan.get("direct_answer"):
-            return {"answer": intent_plan["direct_answer"], "dataframe": None}
-        return {"answer": "Desculpe, não consegui entender o período de tempo na sua pergunta.", "dataframe": None}
-    
-    action_plan = intent_plan["action_plan"]
-    
-    # --- CORREÇÃO DO TypeError ---
-    # 1. Guardamos o dataset_id para usar depois.
-    dataset_id = action_plan.get("dataset_id")
+    if "error" in period_plan or "start_year" not in period_plan:
+        error_message = period_plan.get("error", "Não consegui identificar o período na sua pergunta.")
+        return {"answer": error_message, "dataframe": None}
 
-    # 2. Criamos um dicionário SÓ com os argumentos que o data_collector espera.
-    collector_args = {
-        "dataset_slug": action_plan.get("dataset_slug"),
-        "file_prefix": action_plan.get("file_prefix"),
-        "extension": action_plan.get("extension"),
-        "start_year": action_plan.get("start_year"),
-        "end_year": action_plan.get("end_year"),
-        "frequency": action_plan.get("frequency"),
-    }
-    
-    # 3. Chamamos o data_collector com os argumentos filtrados.
-    final_df = fetch_and_combine_data(**collector_args)
-    # --- FIM DA CORREÇÃO ---
+    start_year = period_plan["start_year"]
+    end_year = period_plan["end_year"]
+    print(f"[Orquestrador] Período identificado: de {start_year} a {end_year}.")
 
+    # 3. Obter informações do dataset que queremos analisar (hardcoded por enquanto)
+    # Estamos assumindo que todas as perguntas são sobre este dataset
+    dataset_info = CURATED_DATASET
+    
+    # 4. Acionar o coletor de dados com os parâmetros corretos
+    print(f"\n[Orquestrador] Acionando o coletor de dados...")
+    final_df = fetch_and_combine_data(
+        dataset_slug=dataset_info["slug"],
+        file_prefix=dataset_info["file_prefix"],
+        start_year=start_year,
+        end_year=end_year,
+        extension=dataset_info["extension"]
+    )
+    
+    # 5. Gerar o insight se os dados foram coletados com sucesso
     if final_df is not None and not final_df.empty:
-        text_answer = get_insight_from_data(user_query, final_df, dataset_id)
-        return {"answer": text_answer, "dataframe": final_df}
+        print("\n[Orquestrador] Enviando dados para o motor de insights...")
+        
+        # O insight_engine precisa do dataset_id, vamos passá-lo
+        text_answer = get_insight_from_data(user_query, final_df, dataset_info["id"])
+        
+        return {"answer": text_answer, "dataframe": final_df.to_dict('records')} # É uma boa prática enviar o df como dict
     else:
-        return {"answer": "Não foi possível encontrar dados para o período solicitado.", "dataframe": None}
+        return {
+            "answer": f"Não consegui baixar ou processar os dados de {start_year} a {end_year}. Os arquivos podem estar indisponíveis ou o período solicitado pode não ter dados.", 
+            "dataframe": None
+        }

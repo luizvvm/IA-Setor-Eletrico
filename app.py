@@ -1,5 +1,3 @@
-# app.py
-
 # --- Importações e Configuração do Path ---
 import sys
 import os
@@ -8,6 +6,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 import dash
 from dash import dcc, html, Input, Output, State
 import dash_bootstrap_components as dbc
+import pandas as pd # Adicionado para manipulação de DataFrame
 
 from src.logic.orchestrator import run_query_pipeline
 from src.logic.response_generator import generate_response_components
@@ -21,7 +20,7 @@ CARD_USER_BG_COLOR = PRIMARY_COLOR
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 server = app.server
-app.title = "Termômetro Energético"
+app.title = "LumIA"
 
 # --- Layout do Aplicativo ---
 app.layout = dbc.Container(
@@ -56,7 +55,7 @@ app.layout = dbc.Container(
                             style={'marginRight': '15px', 'borderRadius': '8px'}
                         ),
                         html.H2(
-                            "Termômetro Energético",
+                            "LumIA",
                             style={'color': BACKGROUND_WHITE, 'fontWeight': 'bold', 'marginBottom': '0'}
                         )
                     ]
@@ -108,7 +107,7 @@ app.layout = dbc.Container(
                                 children=[
                                     dbc.Input(
                                         id='user-input',
-                                        placeholder='Pergunte à Lea sobre reservatórios, geração de energia...',
+                                        placeholder='Pergunte à Lea sobre disponibilidade de usinas...',
                                         n_submit=0,
                                         style={
                                             'borderRadius': '10px 0 0 10px',
@@ -145,8 +144,8 @@ app.layout = dbc.Container(
         )
     ]
 )
+# Em app.py, substitua a função update_chat inteira por esta:
 
-# --- Callback Único e Robusto para o Chat ---
 @app.callback(
     Output('chat-history-display', 'children'),
     Output('chat-history-store', 'data'),
@@ -165,28 +164,43 @@ def update_chat(n_clicks, n_submit, user_query, chat_history):
     # Adiciona a pergunta do usuário ao histórico
     chat_history.append({'speaker': 'user', 'message': user_query})
     
-    # --- AQUI ESTÁ A MUDANÇA: Passamos o histórico para o pipeline ---
+    # Chama o pipeline para obter a resposta da IA
     pipeline_result = run_query_pipeline(user_query, chat_history)
     
-    # Adiciona a resposta da IA ao histórico
-    chat_history.append({'speaker': 'ai', 'message': pipeline_result})
+    # --- CORREÇÃO APLICADA AQUI ---
+    # Prepara a mensagem da IA para ser armazenada no dcc.Store
+    ai_message_for_storage = {
+        'answer': pipeline_result.get('answer'),
+        'dataframe': None
+    }
+    # pipeline_result['dataframe'] já é uma lista de dicionários
+    dataframe_list = pipeline_result.get('dataframe') 
+
+    # Verifica se a lista existe e não está vazia
+    if dataframe_list: 
+        # Atribui a lista diretamente, pois ela já está no formato para armazenamento
+        ai_message_for_storage['dataframe'] = dataframe_list
+    # --- FIM DA CORREÇÃO ---
+
+    # Adiciona a resposta da IA (já serializada) ao histórico
+    chat_history.append({'speaker': 'ai', 'message': ai_message_for_storage})
     
     # Monta o layout de exibição do chat a partir do histórico completo
     chat_display_layout = []
     for item in chat_history:
         is_user = item['speaker'] == 'user'
         
-        # Define o conteúdo da mensagem
         if is_user:
             message_content = html.P(item['message'], style={'marginBottom': '0', 'fontSize': '1.05rem'})
         else: # É a IA
-            # A mensagem da IA é um dicionário, então passamos para o gerador de componentes
+            df_data = item['message'].get('dataframe')
+            df = pd.DataFrame(df_data) if df_data is not None else None
+            
             message_content = generate_response_components(
                 item['message'].get('answer'), 
-                item['message'].get('dataframe')
+                df
             )
 
-        # Define o estilo do card
         card_style = {
             'width': 'fit-content',
             'maxWidth': '80%' if is_user else '85%',
