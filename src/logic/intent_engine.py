@@ -17,54 +17,63 @@ def configure_gemini():
         raise ValueError("A chave da API do Gemini não foi encontrada.")
     genai.configure(api_key=api_key)
 
-def get_intent_from_gemini(user_query: str, catalog_data: list) -> dict:
+def _extract_json_from_response(text: str) -> dict:
+    try:
+        json_start_index = text.find('{')
+        if json_start_index == -1: return {"error": "JSON não encontrado"}
+        json_end_index = text.rfind('}')
+        if json_end_index == -1: return {"error": "Fim do JSON não encontrado"}
+        json_str = text[json_start_index : json_end_index + 1]
+        return json.loads(json_str)
+    except json.JSONDecodeError:
+        raise
+
+def get_intent_from_gemini(user_query: str, catalog_data: list, chat_history: list = []) -> dict:
     model = genai.GenerativeModel(WORKING_GEMINI_MODEL)
-    catalog_str = json.dumps(catalog_data, indent=2, ensure_ascii=False)
+    
+    # Pegamos os detalhes do nosso único dataset
+    dataset_info = catalog_data[0]
 
-    # --- PROMPT DE CLASSIFICAÇÃO DE INTENÇÃO ---
     prompt = f"""
-    Sua primeira e mais importante tarefa é classificar a intenção do usuário em uma de três categorias: 'list_datasets', 'describe_dataset', ou 'fetch_and_analyze'.
+    Sua única função é extrair o período de tempo (ano de início e fim) da pergunta do usuário.
+    O usuário sempre estará perguntando sobre o dataset de 'Indicadores de Disponibilidade de Geração'.
 
-    - Use 'list_datasets' se o usuário perguntar quais datasets estão disponíveis.
-    - Use 'describe_dataset' se o usuário perguntar sobre o que é um dataset específico (ex: "fala sobre o que?", "o que são os dados de...?").
-    - Use 'fetch_and_analyze' para todas as outras perguntas que exigem busca e análise de dados (ex: "qual foi o intercâmbio em 2023?").
+    - Se o usuário mencionar apenas um ano, use-o como ano de início e fim.
+    - Se o usuário não mencionar um ano, use o ano atual ({pd.Timestamp.now().year}) como padrão.
+    - Ignore os meses. A análise será sempre anual.
 
-    Depois de definir a intenção, siga as regras para cada uma:
+    Retorne um ÚNICO objeto JSON com as chaves "start_year" e "end_year". NADA MAIS.
 
-    1. Se a intenção for 'list_datasets':
-       Retorne APENAS: {{"intent": "list_datasets"}}
-
-    2. Se a intenção for 'describe_dataset':
-       - Encontre o dataset no catálogo que melhor corresponde à pergunta do usuário.
-       - Retorne APENAS: {{"intent": "describe_dataset", "dataset_title": "título do dataset escolhido"}}
-
-    3. Se a intenção for 'fetch_and_analyze':
-       - Encontre o MELHOR dataset no catálogo para responder a pergunta.
-       - Extraia os parâmetros: 'dataset_slug', 'file_prefix', 'extension'.
-       - Extraia o período em anos. Se não houver, use o ano atual ({pd.Timestamp.now().year}).
-       - Determine a frequência ('monthly' ou 'yearly') baseado nos nomes dos arquivos no catálogo.
-       - Retorne o JSON completo: {{"intent": "fetch_and_analyze", "action_plan": {{...todos os parâmetros...}}}}
-
-    **Catálogo de Datasets Disponíveis:**
-    ```json
-    {catalog_str}
-    ```
-
-    **Pergunta do Usuário:**
+    Pergunta do Usuário:
     "{user_query}"
 
-    **JSON de Saída:**
+    JSON de Saída:
     """
 
-    print("--- Enviando prompt de intenção para o Gemini (com timeout de 60s)... ---")
+    print("--- Enviando prompt focado para o Gemini... ---")
     
     try:
         request_options = {"timeout": 60}
         response = model.generate_content(prompt, request_options=request_options)
-        response_text = response.text.strip().replace("```json", "").replace("```", "")
-        print(f"--- Resposta de intenção recebida do Gemini ---\n{response_text}")
-        intent_plan = json.loads(response_text)
-        return intent_plan
+        print(f"--- Resposta bruta recebida ---\n{response.text}")
+        
+        # Extrai o período (start_year, end_year)
+        period_plan = _extract_json_from_response(response.text)
+
+        # Monta o plano de ação completo, adicionando os dados fixos do nosso dataset
+        action_plan = {
+            "dataset_id": dataset_info["id"],
+            "dataset_slug": dataset_info["slug"],
+            "file_prefix": dataset_info["file_prefix"],
+            "extension": dataset_info["extension"],
+            "frequency": dataset_info["frequency"],
+            "start_year": period_plan.get("start_year"),
+            "end_year": period_plan.get("end_year")
+        }
+        
+        # Retorna a estrutura completa que o orquestrador espera
+        return {"intent": "fetch_and_analyze", "action_plan": action_plan}
+
     except Exception as e:
-        print(f"Erro ao obter intenção da IA: {e}")
+        print(f"Erro ao obter ou processar a intenção da IA: {e}")
         return {"error": f"Ocorreu um erro ao interpretar sua pergunta: {e}"}

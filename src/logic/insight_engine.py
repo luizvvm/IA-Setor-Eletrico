@@ -3,57 +3,66 @@
 import pandas as pd
 import google.generativeai as genai
 
-# Usaremos o mesmo modelo que já funciona para você
-WORKING_GEMINI_MODEL = "gemini-2.5-flash-lite" 
+WORKING_GEMINI_MODEL = "gemini-2.5-flash-lite"
 
-def get_insight_from_data(user_query: str, df: pd.DataFrame) -> str:
+def get_insight_from_data(user_query: str, df: pd.DataFrame, dataset_id: str) -> str:
     """
-    Recebe a pergunta original do usuário e um DataFrame, e usa a IA para
-    gerar uma resposta em texto baseada nos dados.
-
-    Args:
-        user_query (str): A pergunta original do usuário.
-        df (pd.DataFrame): O DataFrame com os dados coletados.
-
-    Returns:
-        str: Uma resposta em texto gerada pela IA.
+    Recebe os dados de disponibilidade e gera uma análise em texto.
     """
     model = genai.GenerativeModel(WORKING_GEMINI_MODEL)
     
-    # --- Preparação dos Dados para a IA ---
-    # Não podemos enviar 167 mil linhas para a IA.
-    # Vamos enviar um resumo estatístico e as primeiras linhas como contexto.
-    data_summary = df.describe(include='all').to_string()
-    data_head = df.head(5).to_string()
+    analysis_type = "Disponibilidade de Usinas"
+    data_context = ""
+    
+    try:
+        # --- LÓGICA DE ANÁLISE CORRIGIDA ---
+        # 1. Procura pela coluna correta 'val_dispf'
+        disponibilidade_col = 'val_dispf'
+        if disponibilidade_col not in df.columns:
+            return "Não encontrei a coluna 'val_dispf' nos dados para analisar a disponibilidade."
 
+        # 2. Converte a coluna para numérico, tratando vírgulas como decimais e tratando erros
+        if df[disponibilidade_col].dtype == 'object':
+             df[disponibilidade_col] = df[disponibilidade_col].str.replace(',', '.', regex=False).astype(float)
+        
+        df.dropna(subset=[disponibilidade_col], inplace=True)
+
+        # 3. Realiza a análise
+        avg_by_usina = df.groupby('nom_usina')[disponibilidade_col].mean().sort_values(ascending=False)
+        
+        data_context += f"Resumo da Disponibilidade Média por Usina no período solicitado:\n"
+        data_context += "\n**Usinas com Maior Disponibilidade Média:**\n"
+        for usina, value in avg_by_usina.head(5).items():
+            data_context += f"- {usina}: {value:.2f}%\n"
+        
+        data_context += "\n**Usinas com Menor Disponibilidade Média:**\n"
+        for usina, value in avg_by_usina.tail(5).items():
+            data_context += f"- {usina}: {value:.2f}%\n"
+            
+    except Exception as e:
+        print(f"ERRO durante a pré-análise dos dados de disponibilidade: {e}")
+        return "Desculpe, encontrei um erro ao tentar analisar os dados de disponibilidade. Verifique o formato do arquivo."
+
+    # --- Montagem do Prompt Final ---
     prompt = f"""
-    Você é um assistente de análise de dados para jornalistas e leigos, trabalhando com dados do Operador Nacional do Sistema Elétrico (ONS). Sua tarefa é responder à pergunta do usuário de forma clara e direta, baseando-se exclusivamente nos dados fornecidos.
+    Você é um assistente de dados da ONS especialista em disponibilidade de usinas.
+    Responda à pergunta do usuário usando o resumo pré-analisado fornecido.
 
-    **Pergunta Original do Usuário:**
-    "{user_query}"
-
-    **Dados extraídos para sua análise:**
-
-    1. Resumo Estatístico dos Dados:
+    **Tipo de Análise Realizada:** {analysis_type}
+    **Pergunta do Usuário:** "{user_query}"
+    **Resumo dos Dados para sua Análise:**
     ```
-    {data_summary}
+    {data_context}
     ```
-
-    2. Amostra das Primeiras Linhas dos Dados:
-    ```
-    {data_head}
-    ```
-
     **Sua Resposta:**
-    Responda à pergunta do usuário em português. Seja conciso e foque nos insights principais que os dados revelam. Se os dados permitirem, calcule totais, médias ou aponte tendências. NÃO invente informações. Se os dados não forem suficientes para responder, diga isso claramente.
+    Formule uma resposta clara em português, explicando os principais pontos. Destaque as usinas com maior e menor disponibilidade e o que isso pode significar.
     """
 
-    print("--- Enviando dados para o Módulo de Insights (2ª chamada à IA)... ---")
+    print(f"--- Enviando contexto ({analysis_type}) para o Módulo de Insights... ---")
     
     try:
         response = model.generate_content(prompt)
-        print("--- Resposta em texto recebida! ---")
         return response.text
     except Exception as e:
         print(f"Erro ao gerar insight: {e}")
-        return "Desculpe, ocorreu um erro ao tentar interpretar os dados."
+        return "Desculpe, ocorreu um erro ao interpretar os dados."
