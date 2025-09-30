@@ -29,7 +29,6 @@ def format_datasets_for_llm(datasets: list) -> list:
     for dataset in datasets:
         resources = []
         for resource in dataset.get("resources", []):
-            # Adicionamos todos os formatos relevantes e suas URLs
             if resource.get("format", "").upper() in ['CSV', 'XLSX']:
                 resources.append({
                     "name": resource.get("name"),
@@ -41,6 +40,6 @@ def format_datasets_for_llm(datasets: list) -> list:
             "id": dataset.get("name"),
             "title": dataset.get("title"),
             "notes": dataset.get("notes"),
-            "resources": resources # A lista de arquivos agora tem múltiplos formatos
+            "resources": resources 
         })
     return formatted_list

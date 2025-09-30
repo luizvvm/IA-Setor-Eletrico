@@ -6,12 +6,12 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 import dash
 from dash import dcc, html, Input, Output, State
 import dash_bootstrap_components as dbc
-import pandas as pd # Adicionado para manipulação de DataFrame
+import pandas as pd 
 
 from src.logic.orchestrator import run_query_pipeline
 from src.logic.response_generator import generate_response_components
 
-# --- Paleta de Cores e Configurações Iniciais ---
+# Paleta de Cores e Configurações Iniciais
 PRIMARY_COLOR = "#4cd45d"
 BACKGROUND_WHITE = "#FFFFFF"
 TEXT_COLOR_DARK = "#333333"
@@ -22,7 +22,7 @@ app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 server = app.server
 app.title = "LumIA"
 
-# --- Layout do Aplicativo ---
+# Layout do Aplicativo
 app.layout = dbc.Container(
     fluid=True,
     style={
@@ -33,7 +33,7 @@ app.layout = dbc.Container(
         'padding': '0',
     },
     children=[
-        # --- Barra Superior (Header) ---
+        # Barra Superior (Header)
         html.Header(
             style={
                 'backgroundColor': PRIMARY_COLOR,
@@ -68,7 +68,7 @@ app.layout = dbc.Container(
             ]
         ),
 
-        # --- Área Principal do Chat ---
+        # Área Principal do Chat
         dbc.Container(
             className="my-5",
             style={'maxWidth': '900px'},
@@ -144,7 +144,6 @@ app.layout = dbc.Container(
         )
     ]
 )
-# Em app.py, substitua a função update_chat inteira por esta:
 
 @app.callback(
     Output('chat-history-display', 'children'),
@@ -167,22 +166,19 @@ def update_chat(n_clicks, n_submit, user_query, chat_history):
     # Chama o pipeline para obter a resposta da IA
     pipeline_result = run_query_pipeline(user_query, chat_history)
     
-    # --- CORREÇÃO APLICADA AQUI ---
     # Prepara a mensagem da IA para ser armazenada no dcc.Store
     ai_message_for_storage = {
         'answer': pipeline_result.get('answer'),
         'dataframe': None
     }
-    # pipeline_result['dataframe'] já é uma lista de dicionários
+
     dataframe_list = pipeline_result.get('dataframe') 
 
     # Verifica se a lista existe e não está vazia
     if dataframe_list: 
-        # Atribui a lista diretamente, pois ela já está no formato para armazenamento
         ai_message_for_storage['dataframe'] = dataframe_list
-    # --- FIM DA CORREÇÃO ---
 
-    # Adiciona a resposta da IA (já serializada) ao histórico
+    # Adiciona a resposta da IA ao histórico
     chat_history.append({'speaker': 'ai', 'message': ai_message_for_storage})
     
     # Monta o layout de exibição do chat a partir do histórico completo
@@ -221,6 +217,5 @@ def update_chat(n_clicks, n_submit, user_query, chat_history):
     
     return chat_display_layout, chat_history, "", ""
 
-# --- Bloco para Executar o Aplicativo ---
 if __name__ == '__main__':
     app.run(debug=True)

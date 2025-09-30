@@ -15,19 +15,15 @@ def get_insight_from_data(user_query: str, df: pd.DataFrame, dataset_id: str) ->
     data_context = ""
     
     try:
-        # --- LÓGICA DE ANÁLISE CORRIGIDA ---
-        # 1. Procura pela coluna correta 'val_dispf'
         disponibilidade_col = 'val_dispf'
         if disponibilidade_col not in df.columns:
             return "Não encontrei a coluna 'val_dispf' nos dados para analisar a disponibilidade."
 
-        # 2. Converte a coluna para numérico, tratando vírgulas como decimais e tratando erros
         if df[disponibilidade_col].dtype == 'object':
              df[disponibilidade_col] = df[disponibilidade_col].str.replace(',', '.', regex=False).astype(float)
         
         df.dropna(subset=[disponibilidade_col], inplace=True)
 
-        # 3. Realiza a análise
         avg_by_usina = df.groupby('nom_usina')[disponibilidade_col].mean().sort_values(ascending=False)
         
         data_context += f"Resumo da Disponibilidade Média por Usina no período solicitado:\n"
@@ -43,7 +39,6 @@ def get_insight_from_data(user_query: str, df: pd.DataFrame, dataset_id: str) ->
         print(f"ERRO durante a pré-análise dos dados de disponibilidade: {e}")
         return "Desculpe, encontrei um erro ao tentar analisar os dados de disponibilidade. Verifique o formato do arquivo."
 
-    # --- Montagem do Prompt Final ---
     prompt = f"""
     Você é um assistente de dados da ONS especialista em disponibilidade de usinas.
     Responda à pergunta do usuário usando o resumo pré-analisado fornecido.

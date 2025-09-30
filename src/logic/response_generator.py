@@ -11,38 +11,38 @@ def generate_response_components(ai_answer: str, df: pd.DataFrame = None, primar
     """
     # Componente para a resposta principal da IA (Lea)
     main_answer_component = dcc.Markdown(
-        f"**Lea:** {ai_answer}", # Adiciona o nome da IA
+        f"**Lea:** {ai_answer}", 
         className="mb-3",
-        style={'fontSize': '1.05rem', 'lineHeight': '1.6'} # Estilo do texto da IA
+        style={'fontSize': '1.05rem', 'lineHeight': '1.6'}
     )
 
-    # Componente para os dados brutos (se existirem)
+    # Componente para os dados brutos 
     data_details_component = html.Div()
     if df is not None and not df.empty:
         # Prepara a DataTable com o estilo clean
         data_table = dash_table.DataTable(
             columns=[{"name": i, "id": i} for i in df.columns],
             data=df.to_dict('records'),
-            page_size=10, # Limita o número de linhas exibidas por página
+            page_size=10,
             page_action="native",
             sort_action="native",
             filter_action="native",
             style_table={
                 'overflowX': 'auto',
-                'border': f'1px solid {card_bg_color}', # Borda da tabela
+                'border': f'1px solid {card_bg_color}', 
                 'borderRadius': '8px',
                 'boxShadow': '0 2px 8px rgba(0,0,0,0.05)',
             },
             style_header={
-                'backgroundColor': primary_color, # Fundo do cabeçalho da tabela com a cor primária
+                'backgroundColor': primary_color, 
                 'color': 'white',
                 'fontWeight': 'bold',
-                'borderBottom': 'none', # Remove a borda inferior do cabeçalho
+                'borderBottom': 'none', 
                 'padding': '12px 15px',
                 'fontSize': '0.95rem',
             },
             style_data_conditional=[
-                {'if': {'row_index': 'odd'}, 'backgroundColor': '#fcfcfc'}, # Linhas alternadas
+                {'if': {'row_index': 'odd'}, 'backgroundColor': '#fcfcfc'}, 
                 {'if': {'row_index': 'even'}, 'backgroundColor': 'white'},
             ],
             style_cell={
@@ -50,11 +50,10 @@ def generate_response_components(ai_answer: str, df: pd.DataFrame = None, primar
                 'textAlign': 'left',
                 'fontFamily': '"Poppins", sans-serif',
                 'color': text_color_dark,
-                'border': 'none', # Remove bordas internas das células
+                'border': 'none',
             }
         )
 
-        # Acordeão para a tabela
         data_details_component = dbc.Accordion(
             [
                 dbc.AccordionItem(
@@ -62,24 +61,23 @@ def generate_response_components(ai_answer: str, df: pd.DataFrame = None, primar
                     title=f"Ver {len(df)} linhas de dados brutos",
                     item_id="dados-brutos-item",
                     style={
-                        '--bs-accordion-bg': 'white', # Fundo do item do acordeão
+                        '--bs-accordion-bg': 'white',
                         '--bs-accordion-color': text_color_dark,
-                        '--bs-accordion-active-bg': primary_color, # Cor de fundo do cabeçalho quando ativo
-                        '--bs-accordion-active-color': 'white', # Cor do texto do cabeçalho quando ativo
+                        '--bs-accordion-active-bg': primary_color, 
+                        '--bs-accordion-active-color': 'white',
                         '--bs-accordion-btn-focus-border-color': primary_color,
-                        '--bs-accordion-btn-focus-box-shadow': 'none', # Remove sombra de foco padrão
-                        'borderRadius': '8px', # Arredondamento
+                        '--bs-accordion-btn-focus-box-shadow': 'none', 
+                        'borderRadius': '8px', 
                         'overflow': 'hidden',
-                        'border': 'none' # Remove borda do item
+                        'border': 'none' 
                     },
-                    className="shadow-sm" # Sombra leve para o acordeão
+                    className="shadow-sm"
                 ),
             ],
             start_collapsed=True,
-            flush=True, # Remove bordas externas para um look mais clean
+            flush=True, 
             className="mt-3",
-            style={'borderRadius': '10px', 'border': 'none'} # Arredondamento e sem borda externa
+            style={'borderRadius': '10px', 'border': 'none'} 
         )
 
-    # Retorna uma lista de componentes
     return [main_answer_component, data_details_component]

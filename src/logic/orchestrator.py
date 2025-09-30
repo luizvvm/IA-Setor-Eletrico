@@ -11,20 +11,18 @@ from src.logic.intent_engine import get_intent_from_gemini, configure_gemini
 from src.logic.data_collector import fetch_and_combine_data
 from src.logic.insight_engine import get_insight_from_data
 
-# (Mantenha as importações no topo do arquivo)
-# Adicione esta importação se ela não estiver lá
 from src.logic.dataset_catalog import CURATED_DATASET
 
 def run_query_pipeline(user_query: str, chat_history: list = []) -> dict:
     print("--- INICIANDO PIPELINE DE ORQUESTRAÇÃO (MODO SIMPLIFICADO) ---")
 
-    # 1. Configurar a API do Gemini
+    # Configurar a API do Gemini
     try:
         configure_gemini()
     except ValueError as e:
         return {"answer": f"Erro de configuração da IA: {e}", "dataframe": None}
 
-    # 2. Obter o período (anos) da pergunta do usuário
+    # Obter o período (anos) da pergunta do usuário
     print("[Orquestrador] Extraindo período da pergunta do usuário...")
     period_plan = get_intent_from_gemini(user_query) # Chamada corrigida
     
@@ -36,11 +34,11 @@ def run_query_pipeline(user_query: str, chat_history: list = []) -> dict:
     end_year = period_plan["end_year"]
     print(f"[Orquestrador] Período identificado: de {start_year} a {end_year}.")
 
-    # 3. Obter informações do dataset que queremos analisar (hardcoded por enquanto)
-    # Estamos assumindo que todas as perguntas são sobre este dataset
+    # Obter informações do dataset que queremos analisar (hardcoded msm)
+    # Por enquanto vamos trabalhar com todas as perguntas desse dataset mesmo
     dataset_info = CURATED_DATASET
     
-    # 4. Acionar o coletor de dados com os parâmetros corretos
+    # Acionar o coletor de dados com os parâmetros corretos
     print(f"\n[Orquestrador] Acionando o coletor de dados...")
     final_df = fetch_and_combine_data(
         dataset_slug=dataset_info["slug"],
@@ -50,7 +48,7 @@ def run_query_pipeline(user_query: str, chat_history: list = []) -> dict:
         extension=dataset_info["extension"]
     )
     
-    # 5. Gerar o insight se os dados foram coletados com sucesso
+    # Gerar o insight se os dados foram coletados com sucesso
     if final_df is not None and not final_df.empty:
         print("\n[Orquestrador] Enviando dados para o motor de insights...")
         

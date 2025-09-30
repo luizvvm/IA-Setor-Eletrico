@@ -3,4 +3,4 @@ dash-bootstrap-components
 pandas
 plotly
 google-generativeai
-python-dotenv  # Vamos usar para carregar a chave da API
+python-dotenv  
